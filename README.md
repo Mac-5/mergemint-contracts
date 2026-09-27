@@ -155,3 +155,6 @@ contract, read [docs/security.md](docs/security.md) first.
 
 <!-- handsoff-issue-836 -->
 - #836: [Contract] Add unclaim entrypoint for assignees
+
+<!-- handsoff-issue-838 -->
+- #838: [Contract] Add contract level pause switch
