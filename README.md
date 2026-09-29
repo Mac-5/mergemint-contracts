@@ -153,8 +153,5 @@ contract, read [docs/security.md](docs/security.md) first.
 
 ## Handsoff notes
 
-<!-- handsoff-issue-836 -->
-- #836: [Contract] Add unclaim entrypoint for assignees
-
-<!-- handsoff-issue-838 -->
-- #838: [Contract] Add contract level pause switch
+<!-- handsoff-issue-869 -->
+- #869: [Backend] Request ID middleware
