@@ -67,11 +67,16 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 mod db;
 mod rate_limit;
 mod routes;
+mod webhooks;
 
 use db::{new_shared_db, new_shared_idempotency_store};
 use routes::bounties::{get_bounty_route, bounty_stream, claim_bounty, list_bounties, list_bounties_by_assignee};
 use routes::leaderboard::get_leaderboard_route;
 use routes::tx::{new_shared_rate_limiter, resolve_dispute, self_claim, AppState};
+use webhooks::{
+    create_subscription_route, delete_subscription_route, get_subscription_route,
+    list_subscriptions_route, start_webhook_dispatcher, RetryConfig,
+};
 
 /// Maximum allowed request body size (1 MiB).
 const MAX_BODY_BYTES: usize = 1024 * 1024;
@@ -149,6 +154,13 @@ async fn main() {
         leaderboard_cache: routes::leaderboard::new_leaderboard_cache(),
     });
 
+    let webhook_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
+    let _webhook_dispatcher =
+        start_webhook_dispatcher(state.clone(), webhook_client, RetryConfig::default());
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
@@ -165,6 +177,14 @@ async fn main() {
         // ── Bounty push channel (#482) ─────────────────────────────────────
         .route("/bounties/:id/claim", post(claim_bounty))
         .route("/bounties/stream", get(bounty_stream))
+        .route(
+            "/webhooks/subscriptions",
+            post(create_subscription_route).get(list_subscriptions_route),
+        )
+        .route(
+            "/webhooks/subscriptions/:id",
+            get(get_subscription_route).delete(delete_subscription_route),
+        )
         .with_state(state)
         // ── Correlation-ID middleware stack (#486) ──────────────────────────
         //
