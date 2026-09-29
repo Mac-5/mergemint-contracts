@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { useSearchParams } from 'react-router-dom';
+import { api, BountySortField, ListBountiesParams, SortOrder } from '../lib/api';
 import { Bounty, BountyStatus } from '../types';
 import { BountyCard } from '../components/BountyCard';
 import { BountyCardSkeleton } from '../components/BountyCardSkeleton';
 import { useWallet } from '../lib/WalletContext';
 import { mapErrorMessage } from '../utils/format';
 import { useBountyStream } from '../hooks/useBountyStream';
-
-const STATUSES: Array<BountyStatus | 'all'> = ['all', 'open', 'claimed', 'disputed', 'completed', 'cancelled'];
 
 type OwnershipFilter = 'all' | 'created' | 'assigned';
 
@@ -40,12 +39,78 @@ export function BountyList() {
     }
   }, [address, ownership]);
 
+  const updateParam = useCallback(
+    (key: string, value: string | undefined, defaultValue?: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (!value || value === defaultValue || value === 'all') {
+            next.delete(key);
+          } else {
+            next.set(key, value);
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const handleStatusChange = useCallback(
+    (newStatus: BountyStatus | 'all') => {
+      updateParam('status', newStatus, 'all');
+    },
+    [updateParam]
+  );
+
+  const handleTagChange = useCallback(
+    (newTag: string) => {
+      updateParam('tag', newTag.trim() === '' ? undefined : newTag.trim());
+    },
+    [updateParam]
+  );
+
+  const handleSortChange = useCallback(
+    (newSort: BountySortField) => {
+      updateParam('sort', newSort, 'created');
+    },
+    [updateParam]
+  );
+
+  const handleOrderChange = useCallback(
+    (newOrder: SortOrder) => {
+      updateParam('order', newOrder, 'desc');
+    },
+    [updateParam]
+  );
+
+  const handleReset = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('status');
+        next.delete('tag');
+        next.delete('sort');
+        next.delete('order');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
   const fetchPage = useCallback(
     async (cursor?: string) => {
       setLoading(true);
       setError(null);
       try {
-        const params = { status: status === 'all' ? undefined : status, cursor };
+        const params: ListBountiesParams = {
+          status: status === 'all' ? undefined : status,
+          tag: tag || undefined,
+          sort,
+          order,
+          cursor,
+        };
         let page;
         if (ownership === 'created' && address) {
           page = await api.getBountiesByCreator(address, params);
@@ -62,7 +127,7 @@ export function BountyList() {
         setLoading(false);
       }
     },
-    [status, ownership, address]
+    [status, tag, sort, order, ownership, address]
   );
 
   useEffect(() => {
@@ -83,13 +148,17 @@ export function BountyList() {
         </button>
       </div>
 
-      <div className="status-filters">
-        {STATUSES.map((s) => (
-          <button key={s} aria-pressed={status === s} onClick={() => setStatus(s)}>
-            {s}
-          </button>
-        ))}
-      </div>
+      <BountyFilters
+        status={status}
+        tag={tag}
+        sort={sort}
+        order={order}
+        onStatusChange={handleStatusChange}
+        onTagChange={handleTagChange}
+        onSortChange={handleSortChange}
+        onOrderChange={handleOrderChange}
+        onReset={handleReset}
+      />
 
       {error && <p role="alert">{error}</p>}
 
